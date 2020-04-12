@@ -50,7 +50,7 @@ void pcl::KinectAzureDKGrabber::start()
 
 	running = true;
 
-	thread = boost::thread(&KinectAzureDKGrabber::threadFunction, this);
+	thread = std::thread(&KinectAzureDKGrabber::threadFunction, this);
 }
 k4a::calibration pcl::KinectAzureDKGrabber::getCalibration()
 {
@@ -58,7 +58,7 @@ k4a::calibration pcl::KinectAzureDKGrabber::getCalibration()
 }
 void pcl::KinectAzureDKGrabber::stop()
 {
-	boost::unique_lock<boost::mutex> lock(mutex);
+	std::unique_lock<std::mutex> lock(mutex);
 
 	quit = true;
 	running = false;
@@ -68,7 +68,7 @@ void pcl::KinectAzureDKGrabber::stop()
 
 bool pcl::KinectAzureDKGrabber::isRunning() const
 {
-	boost::unique_lock<boost::mutex> lock(mutex);
+	std::unique_lock<std::mutex> lock(mutex);
 
 	return running;
 
@@ -99,7 +99,7 @@ void pcl::KinectAzureDKGrabber::threadFunction()
 {
 	while (!quit)
 	{
-		boost::unique_lock<boost::mutex> lock(mutex);
+		std::unique_lock<std::mutex> lock(mutex);
 		k4a::capture capture;
 		if (!dev.get_capture(&capture, std::chrono::milliseconds(0)))
 		{

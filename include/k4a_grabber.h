@@ -43,8 +43,8 @@ namespace pcl
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr convertRGBDepthToPointXYZRGB();
 		pcl::PointCloud<pcl::PointXYZRGBA>::Ptr convertRGBADepthToPointXYZRGBA();
 
-		boost::thread thread;
-		mutable boost::mutex mutex;
+		std::thread thread;
+		mutable std::mutex mutex;
 
 		void threadFunction();
 

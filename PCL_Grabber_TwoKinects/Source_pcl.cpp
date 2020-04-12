@@ -128,11 +128,11 @@ int main(int argc, char **argv)
 	pcl::PointCloud<PointType>::Ptr cloud_sub;
 
 	// Retrieved Point Cloud Callback Function
-	boost::mutex mutex_master;
+	std::mutex mutex_master;
 	boost::function<void(const pcl::PointCloud<PointType>::ConstPtr&)> function_master =
 		[&cloud_master, &mutex_master](const pcl::PointCloud<PointType>::ConstPtr& ptr)
 	{
-		boost::mutex::scoped_lock lock(mutex_master);
+		std::unique_lock<std::mutex> lock(mutex_master);
 
 		/* Point Cloud Processing */
 
@@ -140,11 +140,11 @@ int main(int argc, char **argv)
 
 	};
 
-	boost::mutex mutex_sub;
+	std::mutex mutex_sub;
 	boost::function<void(const pcl::PointCloud<PointType>::ConstPtr&)> function_sub =
 		[&cloud_sub, &mutex_sub](const pcl::PointCloud<PointType>::ConstPtr& ptr)
 	{
-		boost::mutex::scoped_lock lock(mutex_sub);
+		std::unique_lock<std::mutex> lock(mutex_sub);
 
 		/* Point Cloud Processing */
 
@@ -197,8 +197,8 @@ int main(int argc, char **argv)
 	{
 		// Update Viewer
 		viewer->spinOnce();
-		boost::mutex::scoped_try_lock lock_master(mutex_master);
-		boost::mutex::scoped_try_lock lock_sub(mutex_sub);
+		std::unique_lock<std::mutex> lock_master(mutex_master, std::try_to_lock);
+		std::unique_lock<std::mutex> lock_sub(mutex_sub, std::try_to_lock);
 
 		if (lock_master.owns_lock() && cloud_master &&
 			lock_sub.owns_lock() && cloud_sub)

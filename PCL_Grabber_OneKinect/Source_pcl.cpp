@@ -33,11 +33,11 @@ int main(int argc, char **argv)
 	pcl::PointCloud<PointType>::ConstPtr cloud;
 
 	// Retrieved Point Cloud Callback Function
-	boost::mutex mutex;
+	std::mutex mutex;
 	boost::function<void(const pcl::PointCloud<PointType>::ConstPtr&)> function =
 		[&cloud, &mutex](const pcl::PointCloud<PointType>::ConstPtr& ptr) 
 	{
-		boost::mutex::scoped_lock lock(mutex);
+		std::unique_lock<std::mutex> lock(mutex);
 
 		/* Point Cloud Processing */
 
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 	{
 		// Update Viewer
 		viewer->spinOnce();
-		boost::mutex::scoped_try_lock lock(mutex);
+		std::unique_lock<std::mutex> lock(mutex, std::try_to_lock);
 		if (lock.owns_lock() && cloud) 
 		{
 			// Update Point Cloud
