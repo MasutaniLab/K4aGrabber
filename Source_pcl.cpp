@@ -24,6 +24,7 @@ int main(int argc, char **argv)
 	if (deviceCount == 0)
 	{
 		cout << "no azure kinect devices detected!" << endl;
+		return 1;
 	}
 
 	// PCL Visualizer
@@ -34,7 +35,7 @@ int main(int argc, char **argv)
 
 	// Retrieved Point Cloud Callback Function
 	std::mutex mutex;
-	boost::function<void(const pcl::PointCloud<PointType>::ConstPtr&)> function =
+	std::function<void(const pcl::PointCloud<PointType>::ConstPtr&)> function =
 		[&cloud, &mutex](const pcl::PointCloud<PointType>::ConstPtr& ptr) 
 	{
 		std::unique_lock<std::mutex> lock(mutex);
@@ -45,10 +46,10 @@ int main(int argc, char **argv)
 	};
 
 	// KinectAzureDKGrabber
-	boost::shared_ptr<pcl::Grabber> grabber = 
-		boost::make_shared<pcl::KinectAzureDKGrabber>(0, K4A_DEPTH_MODE_WFOV_2X2BINNED, K4A_IMAGE_FORMAT_COLOR_BGRA32, K4A_COLOR_RESOLUTION_720P);
+	pcl::shared_ptr<pcl::Grabber> grabber = 
+		pcl::make_shared<pcl::KinectAzureDKGrabber>(0, K4A_DEPTH_MODE_WFOV_2X2BINNED, K4A_IMAGE_FORMAT_COLOR_BGRA32, K4A_COLOR_RESOLUTION_720P);
 	
-	boost::shared_ptr<pcl::KinectAzureDKGrabber> grabber_ = boost::dynamic_pointer_cast<pcl::KinectAzureDKGrabber>(grabber);
+	pcl::shared_ptr<pcl::KinectAzureDKGrabber> grabber_ = pcl::dynamic_pointer_cast<pcl::KinectAzureDKGrabber>(grabber);
 	
 
 	// Register Callback Function
@@ -67,9 +68,9 @@ int main(int argc, char **argv)
 	Eigen::Matrix4f extrinsics_eigen = Eigen::Matrix4f::Identity();
 	viewer->setCameraParameters(intrinsics_eigen, extrinsics_eigen);
 
-	while (!viewer->wasStopped()) 
+	while (!viewer->wasStopped())
 	{
-		// Update Viewer
+                // Update Viewer
 		viewer->spinOnce();
 		std::unique_lock<std::mutex> lock(mutex, std::try_to_lock);
 		if (lock.owns_lock() && cloud) 

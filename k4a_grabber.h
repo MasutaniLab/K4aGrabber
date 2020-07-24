@@ -25,10 +25,10 @@ namespace pcl
 		virtual std::string getName() const;
 		virtual float getFramesPerSecond() const;
 
-		typedef void (signal_KinectAzureDK_PointXYZ)(const boost::shared_ptr<const pcl::PointCloud<pcl::PointXYZ>>&);
-		typedef void (signal_KinectAzureDK_PointXYZI)(const boost::shared_ptr<const pcl::PointCloud<pcl::PointXYZI>>&);
-		typedef void (signal_KinectAzureDK_PointXYZRGB)(const boost::shared_ptr<const pcl::PointCloud<pcl::PointXYZRGB>>&);
-		typedef void (signal_KinectAzureDK_PointXYZRGBA)(const boost::shared_ptr<const pcl::PointCloud<pcl::PointXYZRGBA>>&);
+		using signal_KinectAzureDK_PointXYZ = void(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr&);
+		using signal_KinectAzureDK_PointXYZI = void(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr&);
+		using signal_KinectAzureDK_PointXYZRGB = void(const pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr&);
+		using signal_KinectAzureDK_PointXYZRGBA = void(const pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr&);
 	
 	protected:
 		void setupDevice(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_);
