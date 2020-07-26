@@ -2,7 +2,7 @@
 
 #include "k4a_grabber.h"
 
-pcl::KinectAzureDKGrabber::KinectAzureDKGrabber(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_) :
+pcl::KinectAzureDKGrabber::KinectAzureDKGrabber(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_, bool alignToDepth_) :
 	config(K4A_DEVICE_CONFIG_INIT_DISABLE_ALL),
 	dev(nullptr),
 	colorImage(nullptr),
@@ -15,7 +15,7 @@ pcl::KinectAzureDKGrabber::KinectAzureDKGrabber(const int &device_id_, const int
 	signal_PointXYZRGB(nullptr),
 	signal_PointXYZRGBA(nullptr)
 {
-	setupDevice(device_id_, depth_mode_, color_format_, color_resolution_);
+	setupDevice(device_id_, depth_mode_, color_format_, color_resolution_, alignToDepth_);
 
 	signal_PointXYZ = createSignal<signal_KinectAzureDK_PointXYZ>();
 	signal_PointXYZI = createSignal<signal_KinectAzureDK_PointXYZI>();
@@ -85,7 +85,7 @@ float pcl::KinectAzureDKGrabber::getFramesPerSecond() const
 	return config.camera_fps;
 }
 
-void pcl::KinectAzureDKGrabber::setupDevice(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_)
+void pcl::KinectAzureDKGrabber::setupDevice(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_, bool alignToDepth_)
 {
 	device_id = device_id_;
 
@@ -94,6 +94,7 @@ void pcl::KinectAzureDKGrabber::setupDevice(const int &device_id_, const int &de
 	config.color_format = k4a_image_format_t(color_format_);
 	config.color_resolution = k4a_color_resolution_t(color_resolution_);
 	config.synchronized_images_only = true;
+	alignToDepth = alignToDepth_;
 }
 void pcl::KinectAzureDKGrabber::threadFunction()
 {
@@ -151,33 +152,47 @@ void pcl::KinectAzureDKGrabber::threadFunction()
 pcl::PointCloud<pcl::PointXYZ>::Ptr pcl::KinectAzureDKGrabber::convertDepthToPointXYZ()
 {
 	PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>());
-	int color_image_width_pixels = colorImage.get_width_pixels();
-	int color_image_height_pixels = colorImage.get_height_pixels();
 
-	k4a::image transformed_depth_image = NULL;
-	transformed_depth_image = k4a::image::create(K4A_IMAGE_FORMAT_DEPTH16,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * (int)sizeof(uint16_t));
+	int width, height;
+	k4a::image newDepthImage = nullptr;
+	k4a::image newColorImage = nullptr;
+	if (alignToDepth) {
+		width = depthImage.get_width_pixels();
+		height = depthImage.get_height_pixels();
+		newDepthImage = depthImage;
+		newColorImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_COLOR_BGRA32,
+			width, height, width * 4 * (int)sizeof(uint8_t));
+	} else {
+		width = colorImage.get_width_pixels();
+		height = colorImage.get_height_pixels();
+		newDepthImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_DEPTH16,
+			width, height, width * (int)sizeof(uint16_t));
+		newColorImage = colorImage;
+	}
 
-	k4a::image point_cloud_image = NULL;
-	point_cloud_image = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * 3 * (int)sizeof(int16_t));
+	k4a::image pointCloudImage = nullptr;
+	pointCloudImage = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
+		width, height, width * 3 * (int)sizeof(int16_t));
 
-	transformation.depth_image_to_color_camera(depthImage, &transformed_depth_image);
-	transformation.depth_image_to_point_cloud(transformed_depth_image, K4A_CALIBRATION_TYPE_COLOR, &point_cloud_image);
-
-	int width = colorImage.get_width_pixels();
-	int height = colorImage.get_height_pixels();
-
+	if (alignToDepth) {
+		transformation.color_image_to_depth_camera(
+			depthImage, colorImage, &newColorImage);
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_DEPTH, &pointCloudImage);
+	} else {
+		transformation.depth_image_to_color_camera(
+			depthImage, &newDepthImage);
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_COLOR, &pointCloudImage);
+	}
 	cloud->width = width;
 	cloud->height = height;
 	cloud->is_dense = false;
 	cloud->points.resize(cloud->height * cloud->width);
 
-	int16_t *point_cloud_image_data = (int16_t *)(void *)point_cloud_image.get_buffer();
+	int16_t* point_cloud_image_data = (int16_t*)(void*)pointCloudImage.get_buffer();
 
 #ifdef VTK_VISUALIZATION
 	Eigen::Matrix3f m;
@@ -208,41 +223,71 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr pcl::KinectAzureDKGrabber::convertDepthToPoi
 pcl::PointCloud<pcl::PointXYZI>::Ptr pcl::KinectAzureDKGrabber::convertInfraredDepthToPointXYZI()
 {
 	PointCloud<PointXYZI>::Ptr cloud(new PointCloud<PointXYZI>());
-	int color_image_width_pixels = colorImage.get_width_pixels();
-	int color_image_height_pixels = colorImage.get_height_pixels();
+	int width, height;
+	k4a::image newDepthImage = nullptr;
+	k4a::image newColorImage = nullptr;
+	if (alignToDepth) {
+		width = depthImage.get_width_pixels();
+		height = depthImage.get_height_pixels();
+		newDepthImage = depthImage;
+		newColorImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_COLOR_BGRA32,
+			width, height, width * 4 * (int)sizeof(uint8_t));
+	} else {
+		width = colorImage.get_width_pixels();
+		height = colorImage.get_height_pixels();
+		newDepthImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_DEPTH16,
+			width, height, width * (int)sizeof(uint16_t));
+		newColorImage = colorImage;
+	}
 
-	k4a::image transformed_depth_image = NULL;
-	transformed_depth_image = k4a::image::create(K4A_IMAGE_FORMAT_DEPTH16,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * (int)sizeof(uint16_t));
+	//depth_image_to_color_camera_custom()のためにK4A_IMAGE_FORMAT_IR16ではなく，
+	//K4A_IMAGE_FORMAT_CUSTOM16にする
+	k4a::image newInfraredImage = nullptr;
+	newInfraredImage = k4a::image::create(
+		K4A_IMAGE_FORMAT_CUSTOM16,
+		width, height, width * (int)sizeof(uint16_t));
 
-	k4a::image transformed_infrared_image = NULL;
-	transformed_infrared_image = k4a::image::create(K4A_IMAGE_FORMAT_IR16,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * (int)sizeof(uint16_t));
+	k4a::image pointCloudImage = nullptr;
+	pointCloudImage = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
+		width, height, width * 3 * (int)sizeof(int16_t));
 
-	k4a::image point_cloud_image = NULL;
-	point_cloud_image = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * 3 * (int)sizeof(int16_t));
+	if (alignToDepth) {
+		transformation.color_image_to_depth_camera(
+			depthImage, colorImage, &newColorImage);
+		//赤外線画像を深度カメラに変換する方法が不明
+		//transformation.color_image_to_depth_camera(
+		//	depthImage, infraredImage, &newInfraredImage);
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_DEPTH, &pointCloudImage);
+	} else {
+		//depth_image_to_color_camera_custom()がK4A_IMAGE_FORMAT_CUSTOM16にしか対応していないので，それに変換．
+		k4a::image infraredImage2 = nullptr;
+		infraredImage2 = k4a::image::create_from_buffer(
+			K4A_IMAGE_FORMAT_CUSTOM16,
+			infraredImage.get_width_pixels(), 
+			infraredImage.get_height_pixels(),
+			infraredImage.get_width_pixels() * (int)sizeof(uint16_t),
+			infraredImage.get_buffer(),
+			infraredImage.get_width_pixels() * infraredImage.get_height_pixels() * (int)sizeof(uint16_t),
+			nullptr,
+			nullptr
+			);	
 
-	transformation.depth_image_to_color_camera(depthImage, &transformed_depth_image);
-	transformation.depth_image_to_color_camera(infraredImage, &transformed_infrared_image);
-	transformation.depth_image_to_point_cloud(transformed_depth_image, K4A_CALIBRATION_TYPE_COLOR, &point_cloud_image);
-
-	int width = colorImage.get_width_pixels();
-	int height = colorImage.get_height_pixels();
-
+		transformation.depth_image_to_color_camera_custom(
+			depthImage, infraredImage2, &newDepthImage, &newInfraredImage, 
+			K4A_TRANSFORMATION_INTERPOLATION_TYPE_LINEAR, width * sizeof(uint16_t));
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_COLOR, &pointCloudImage);
+	}
 	cloud->width = width;
 	cloud->height = height;
 	cloud->is_dense = false;
 	cloud->points.resize(cloud->height * cloud->width);
 
-	int16_t *point_cloud_image_data = (int16_t *)(void *)point_cloud_image.get_buffer();
-	int16_t *transformed_infrared_image_data = (int16_t *)(void *)transformed_infrared_image.get_buffer();
+	int16_t* point_cloud_image_data = (int16_t*)(void*)pointCloudImage.get_buffer();
+	int16_t* transformed_infrared_image_data = (int16_t*)(void*)newInfraredImage.get_buffer();
 
 #ifdef VTK_VISUALIZATION
 	Eigen::Matrix3f m;
@@ -262,8 +307,12 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr pcl::KinectAzureDKGrabber::convertInfraredD
 			continue;
 		}
 
-		point.intensity = transformed_infrared_image_data[i];
-
+		if (alignToDepth) {
+			//赤外線画像の変換ができていないので仮の値
+			point.intensity = 0xffff;
+		} else {
+			point.intensity = transformed_infrared_image_data[i];
+		}
 #ifdef VTK_VISUALIZATION
 		point.getVector3fMap() = m * point.getVector3fMap();
 #endif
@@ -275,34 +324,48 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr pcl::KinectAzureDKGrabber::convertInfraredD
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl::KinectAzureDKGrabber::convertRGBDepthToPointXYZRGB()
 {
 	PointCloud<PointXYZRGB>::Ptr cloud(new PointCloud<PointXYZRGB>());
-	int color_image_width_pixels = colorImage.get_width_pixels();
-	int color_image_height_pixels = colorImage.get_height_pixels();
 
-	k4a::image transformed_depth_image = NULL;
-	transformed_depth_image = k4a::image::create(K4A_IMAGE_FORMAT_DEPTH16,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * (int)sizeof(uint16_t));
+	int width, height;
+	k4a::image newDepthImage = nullptr;
+	k4a::image newColorImage = nullptr;
+	if (alignToDepth) {
+		width = depthImage.get_width_pixels();
+		height = depthImage.get_height_pixels();
+		newDepthImage = depthImage;
+		newColorImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_COLOR_BGRA32,
+			width, height, width * 4 * (int)sizeof(uint8_t));
+	} else {
+		width = colorImage.get_width_pixels();
+		height = colorImage.get_height_pixels();
+		newDepthImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_DEPTH16,
+			width, height, width * (int)sizeof(uint16_t));
+		newColorImage = colorImage;
+	}
 
-	k4a::image point_cloud_image = NULL;
-	point_cloud_image = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * 3 * (int)sizeof(int16_t));
+	k4a::image pointCloudImage = nullptr;
+	pointCloudImage = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
+		width, height, width * 3 * (int)sizeof(int16_t));
 
-	transformation.depth_image_to_color_camera(depthImage, &transformed_depth_image);
-	transformation.depth_image_to_point_cloud(transformed_depth_image, K4A_CALIBRATION_TYPE_COLOR, &point_cloud_image);
-
-	int width = colorImage.get_width_pixels();
-	int height = colorImage.get_height_pixels();
-
+	if (alignToDepth) {
+		transformation.color_image_to_depth_camera(
+			depthImage, colorImage, &newColorImage);
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_DEPTH, &pointCloudImage);
+	} else {
+		transformation.depth_image_to_color_camera(
+			depthImage, &newDepthImage);
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_COLOR, &pointCloudImage);
+	}
 	cloud->width = width;
 	cloud->height = height;
 	cloud->is_dense = false;
 	cloud->points.resize(cloud->height * cloud->width);
 
-	int16_t *point_cloud_image_data = (int16_t *)(void *)point_cloud_image.get_buffer();
-	uint8_t *color_image_data = colorImage.get_buffer();
+	int16_t* point_cloud_image_data = (int16_t*)(void*)pointCloudImage.get_buffer();
+	uint8_t* color_image_data = newColorImage.get_buffer();
 
 #ifdef VTK_VISUALIZATION
 	Eigen::Matrix3f m;
@@ -341,34 +404,48 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl::KinectAzureDKGrabber::convertRGBDept
 pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pcl::KinectAzureDKGrabber::convertRGBADepthToPointXYZRGBA(/*RGBQUAD* colorBuffer, UINT16* depthBuffer*/)
 {
 	PointCloud<PointXYZRGBA>::Ptr cloud(new PointCloud<PointXYZRGBA>());
-	int color_image_width_pixels = colorImage.get_width_pixels();
-	int color_image_height_pixels = colorImage.get_height_pixels();
 
-	k4a::image transformed_depth_image = NULL;
-	transformed_depth_image = k4a::image::create(K4A_IMAGE_FORMAT_DEPTH16,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * (int)sizeof(uint16_t));
+	int width, height;
+	k4a::image newDepthImage = nullptr;
+	k4a::image newColorImage = nullptr;
+	if (alignToDepth) {
+		width = depthImage.get_width_pixels();
+		height = depthImage.get_height_pixels();
+		newDepthImage = depthImage;
+		newColorImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_COLOR_BGRA32,
+			width, height, width * 4 * (int)sizeof(uint8_t));
+	} else {
+		width = colorImage.get_width_pixels();
+		height = colorImage.get_height_pixels();
+		newDepthImage = k4a::image::create(
+			K4A_IMAGE_FORMAT_DEPTH16,
+			width, height, width * (int)sizeof(uint16_t));
+		newColorImage = colorImage;
+	}
 
-	k4a::image point_cloud_image = NULL;
-	point_cloud_image = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
-		color_image_width_pixels,
-		color_image_height_pixels,
-		color_image_width_pixels * 3 * (int)sizeof(int16_t));
+	k4a::image pointCloudImage = nullptr;
+	pointCloudImage = k4a::image::create(K4A_IMAGE_FORMAT_CUSTOM,
+		width, height, width * 3 * (int)sizeof(int16_t));
 
-	transformation.depth_image_to_color_camera(depthImage, &transformed_depth_image);
-	transformation.depth_image_to_point_cloud(transformed_depth_image, K4A_CALIBRATION_TYPE_COLOR, &point_cloud_image);
-
-	int width = colorImage.get_width_pixels();
-	int height = colorImage.get_height_pixels();
-
+	if (alignToDepth) {
+		transformation.color_image_to_depth_camera(
+			depthImage, colorImage, &newColorImage);
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_DEPTH, &pointCloudImage);
+	} else {
+		transformation.depth_image_to_color_camera(
+			depthImage, &newDepthImage);
+		transformation.depth_image_to_point_cloud(
+			newDepthImage, K4A_CALIBRATION_TYPE_COLOR, &pointCloudImage);
+	}
 	cloud->width = width;
 	cloud->height = height;
 	cloud->is_dense = false;
 	cloud->points.resize(cloud->height * cloud->width);
 
-	int16_t *point_cloud_image_data = (int16_t *)(void *)point_cloud_image.get_buffer();
-	uint8_t *color_image_data = colorImage.get_buffer();
+	int16_t* point_cloud_image_data = (int16_t*)(void*)pointCloudImage.get_buffer();
+	uint8_t* color_image_data = newColorImage.get_buffer();
 
 #ifdef VTK_VISUALIZATION
 	Eigen::Matrix3f m;

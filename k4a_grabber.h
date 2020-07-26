@@ -17,7 +17,7 @@ namespace pcl
 	class KinectAzureDKGrabber : public pcl::Grabber
 	{
 	public:
-		KinectAzureDKGrabber(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_);
+		KinectAzureDKGrabber(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_, bool alignToDepth_ = false);
 		virtual ~KinectAzureDKGrabber() throw ();
 		virtual void start();
 		virtual void stop();
@@ -31,7 +31,7 @@ namespace pcl
 		using signal_KinectAzureDK_PointXYZRGBA = void(const pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr&);
 	
 	protected:
-		void setupDevice(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_);
+		void setupDevice(const int &device_id_, const int &depth_mode_, const int &color_format_, const int &color_resolution_, bool alignToDepth_ = false);
 		
 		boost::signals2::signal<signal_KinectAzureDK_PointXYZ>* signal_PointXYZ;
 		boost::signals2::signal<signal_KinectAzureDK_PointXYZI>* signal_PointXYZI;
@@ -69,6 +69,8 @@ namespace pcl
 		int infraredWidth;
 		int infraredHeight;
 		k4a::image infraredImage;
+
+		bool alignToDepth;
 	public:
 
 		k4a::calibration getCalibration();

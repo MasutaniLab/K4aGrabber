@@ -47,7 +47,7 @@ int main(int argc, char **argv)
 
 	// KinectAzureDKGrabber
 	pcl::shared_ptr<pcl::Grabber> grabber = 
-		pcl::make_shared<pcl::KinectAzureDKGrabber>(0, K4A_DEPTH_MODE_WFOV_2X2BINNED, K4A_IMAGE_FORMAT_COLOR_BGRA32, K4A_COLOR_RESOLUTION_720P);
+		pcl::make_shared<pcl::KinectAzureDKGrabber>(0, K4A_DEPTH_MODE_WFOV_2X2BINNED, K4A_IMAGE_FORMAT_COLOR_BGRA32, K4A_COLOR_RESOLUTION_720P, true);
 	
 	pcl::shared_ptr<pcl::KinectAzureDKGrabber> grabber_ = pcl::dynamic_pointer_cast<pcl::KinectAzureDKGrabber>(grabber);
 	
@@ -70,16 +70,22 @@ int main(int argc, char **argv)
 
 	while (!viewer->wasStopped())
 	{
-                // Update Viewer
+        // Update Viewer
 		viewer->spinOnce();
 		std::unique_lock<std::mutex> lock(mutex, std::try_to_lock);
 		if (lock.owns_lock() && cloud) 
 		{
 			// Update Point Cloud
-			if (!viewer->updatePointCloud(cloud, "cloud"))
-			{
+#if 1
+			if (!viewer->updatePointCloud(cloud, "cloud")) {
 				viewer->addPointCloud(cloud, "cloud");
 			}
+#else
+			//<PointType>を省略するとpcl::PointXYZIの場合にビルドエラーになる
+			if (!viewer->updatePointCloud<PointType>(cloud, "cloud")) {
+				viewer->addPointCloud<PointType>(cloud, "cloud");
+			}
+#endif
 		}
 	}
 

@@ -1,7 +1,7 @@
 # K4aGrabber (Masutani Lab version)
 升谷 保博  
 大阪電気通信大学  
-2020年4月15日
+2020年7月26日
 
 [オリジナルの`README.md`はこちら](README-original.md)
 
@@ -20,7 +20,7 @@
 - Windows 10 64bit版
 - Visual Studio 2019 x64
 - Azure Kinect SDK v1.4.0
-- Point Cloud Library 1.10.1 AllinOne (VS2019 64bit用)
+- Point Cloud Library 1.11.0 AllinOne (VS2019 64bit用)
 
 ## 準備
 - [GitHubのpclのRelease](https://github.com/PointCloudLibrary/pcl/releases)の中のWindows用AllInOne `PCL-X.X.X-AllInOne-msvcXXXX-winXX.exe`をダウンロードし実行．
@@ -42,3 +42,11 @@
 ## 既知の問題・TODO
 - 検証不十分．
 
+## 履歴
+
+- 2020年7月26日
+  - カラー画像を深度カメラに合わせるオプションを追加．`KinectAzureDKGrabber` のコンストラクタ，および，`KinectAzureDKGrabber::setupDevice()`の第5引数`alignToDepth_`をtrueにする（デフォルトはfalse）．
+  - PCL 1.11に対応．
+
+- 2020年4月15日
+  - 最初のリリース．
