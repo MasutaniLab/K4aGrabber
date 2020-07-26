@@ -10,7 +10,7 @@
 - Haipeng Wang氏が公開しているAzure Kinect DKのPCL用Grabber[K4aGrabber](https://github.com/forestsen/K4aGrabber)を簡単化したものです．
 - オリジナルとの違い．
   - Kinectを2台使うプログラムを削除．Open3Dに依存しないようにした．
-  - PCL 1.10に対応させた．
+  - PCL 1.11に対応させた．
   - CMakeの際にAzure Kinect SDKのバージョンに依存しないようにした．
   - 杉浦氏の[Findk4a.cmake](https://gist.github.com/UnaNancyOwen/90b898366eb908d29cb4c2b509ab6cfa#file-findk4a-cmake)を導入した．
   - ディレクトリ構成を変更．使わないファイルを削除．
